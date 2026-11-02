@@ -1,0 +1,6 @@
+{
+  "name": "LexiCraft - Word Puzzle Game",
+  "description": "A sleek, professional 5-letter word puzzle game featuring daily challenges, unlimited practice, hard mode, rich Web Audio feedback, and detailed statistics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

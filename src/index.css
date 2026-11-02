@@ -1,0 +1,115 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+  }
+}
+
+/* 3D Tile Flip Animation */
+@keyframes tile-flip {
+  0% {
+    transform: rotateX(0deg);
+  }
+  50% {
+    transform: rotateX(90deg);
+  }
+  100% {
+    transform: rotateX(0deg);
+  }
+}
+
+/* Typing Pop Animation */
+@keyframes tile-pop {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.7;
+  }
+  40% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Shake Animation for Invalid Guess */
+@keyframes row-shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  20%, 60% {
+    transform: translateX(-6px);
+  }
+  40%, 80% {
+    transform: translateX(6px);
+  }
+}
+
+/* Victory Wave Bounce */
+@keyframes tile-bounce {
+  0%, 20% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-24px) scale(1.05);
+  }
+  50% {
+    transform: translateY(0);
+  }
+  60% {
+    transform: translateY(-8px);
+  }
+  80%, 100% {
+    transform: translateY(0);
+  }
+}
+
+.animate-tile-pop {
+  animation: tile-pop 120ms cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.animate-row-shake {
+  animation: row-shake 400ms ease-in-out;
+}
+
+.animate-tile-bounce {
+  animation: tile-bounce 900ms cubic-bezier(0.28, 0.84, 0.42, 1) forwards;
+}
+
+/* Keyboard active tactile effect */
+.key-press-effect:active {
+  transform: translateY(2px) scale(0.96);
+}
+
+/* Perspective for 3D Tile rotations */
+.perspective-tile {
+  perspective: 1000px;
+}
+
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .animate-tile-pop,
+  .animate-row-shake,
+  .animate-tile-bounce,
+  .key-press-effect:active {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+}

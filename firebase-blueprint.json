@@ -1,0 +1,85 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User profile with display name and aggregate multiplayer statistics.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "displayName": { "type": "string", "maxLength": 64 },
+        "email": { "type": "string", "maxLength": 128 },
+        "photoURL": { "type": "string", "maxLength": 512 },
+        "mpWins": { "type": "number" },
+        "mpGames": { "type": "number" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["uid", "displayName"]
+    },
+    "Room": {
+      "title": "Multiplayer Game Room",
+      "description": "A synchronized multiplayer room supporting 1v1, 2v2, 3v3 team battles, FFA, and Fastest Finger First Word Sprint.",
+      "type": "object",
+      "properties": {
+        "roomId": { "type": "string", "maxLength": 32 },
+        "code": { "type": "string", "maxLength": 8 },
+        "hostId": { "type": "string", "maxLength": 128 },
+        "hostName": { "type": "string", "maxLength": 64 },
+        "status": { "type": "string", "enum": ["WAITING", "PLAYING", "FINISHED"] },
+        "format": { "type": "string", "enum": ["1v1", "2v2", "3v3", "ffa", "sprint"] },
+        "targetWord": { "type": "string", "maxLength": 10 },
+        "roundNumber": { "type": "number" },
+        "sprintLimitType": { "type": "string", "enum": ["words", "time"] },
+        "sprintTargetWords": { "type": "number" },
+        "sprintTimeLimitSeconds": { "type": "number" },
+        "sprintExpiresAt": { "type": "number" },
+        "roundWinnerName": { "type": "string", "maxLength": 64 },
+        "roundWinnerWord": { "type": "string", "maxLength": 10 },
+        "scores": { "type": "object" },
+        "teamAGuesses": { "type": "array" },
+        "teamAEmojiRows": { "type": "array" },
+        "teamBGuesses": { "type": "array" },
+        "teamBEmojiRows": { "type": "array" },
+        "winnerId": { "type": "string", "maxLength": 128 },
+        "winnerName": { "type": "string", "maxLength": 64 },
+        "winningTeam": { "type": "string", "enum": ["teamA", "teamB"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["roomId", "code", "hostId", "hostName", "status", "format", "targetWord"]
+    },
+    "Player": {
+      "title": "Room Player Progress",
+      "description": "Real-time state, score, team assignment, and guess boards for a player within a game room.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "displayName": { "type": "string", "maxLength": 64 },
+        "photoURL": { "type": "string", "maxLength": 512 },
+        "team": { "type": "string", "enum": ["teamA", "teamB", "none"] },
+        "score": { "type": "number" },
+        "guesses": { "type": "array" },
+        "emojiRows": { "type": "array" },
+        "attempts": { "type": "number" },
+        "hasWon": { "type": "boolean" },
+        "hasLost": { "type": "boolean" },
+        "completionTime": { "type": "number" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["uid", "displayName", "attempts", "hasWon", "hasLost"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Stores user profiles and stats."
+    },
+    "/rooms/{roomId}": {
+      "schema": "Room",
+      "description": "Collection of multiplayer puzzle rooms."
+    },
+    "/rooms/{roomId}/players/{playerId}": {
+      "schema": "Player",
+      "description": "Player state within a multiplayer room."
+    }
+  }
+}

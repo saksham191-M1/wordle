@@ -1,0 +1,70 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Connection test document
+    match /test/{docId} {
+      allow read: if true;
+    }
+
+    // User profiles & stats
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create, update: if isOwner(userId)
+        && request.resource.data.uid == userId
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() <= 64;
+      allow delete: if false;
+    }
+
+    // Multiplayer Rooms (Supports 1v1, 2v2, 3v3 team battles, and FFA)
+    match /rooms/{roomId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && isValidId(roomId)
+        && request.resource.data.hostId == request.auth.uid
+        && request.resource.data.code is string
+        && request.resource.data.code.size() <= 16
+        && request.resource.data.status in ['WAITING', 'PLAYING', 'FINISHED']
+        && request.resource.data.targetWord is string
+        && request.resource.data.targetWord.size() <= 10;
+
+      allow update: if isSignedIn()
+        && request.resource.data.roomId == resource.data.roomId
+        && request.resource.data.hostId == resource.data.hostId;
+
+      allow delete: if isSignedIn() && resource.data.hostId == request.auth.uid;
+
+      // Players within rooms
+      match /players/{playerId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn()
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.displayName is string
+          && request.resource.data.displayName.size() <= 64;
+
+        allow update: if isSignedIn()
+          && (request.auth.uid == playerId || request.resource.data.uid == request.auth.uid);
+
+        allow delete: if isSignedIn() && (request.auth.uid == playerId || get(/databases/$(database)/documents/rooms/$(roomId)).data.hostId == request.auth.uid);
+      }
+    }
+  }
+}
