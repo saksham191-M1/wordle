@@ -61,8 +61,8 @@ export const StatsModal: React.FC<StatsModalProps> = ({
 
     const updateCountdown = () => {
       const now = new Date();
-      const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-      const diffMs = tomorrow.getTime() - now.getTime();
+      const nextUtcMidnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+      const diffMs = Math.max(0, nextUtcMidnight - now.getTime());
 
       const hours = Math.floor(diffMs / (1000 * 60 * 60));
       const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));

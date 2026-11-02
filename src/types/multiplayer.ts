@@ -26,6 +26,7 @@ export interface RoomData {
   winnerId?: string;
   winnerName?: string;
   winningTeam?: 'teamA' | 'teamB' | null;
+  expiresAt?: number;
   createdAt: string;
   updatedAt: string;
 }

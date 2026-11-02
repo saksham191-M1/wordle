@@ -31,6 +31,7 @@ import {
   savePracticeStats,
   loadRecentPracticeWords,
   saveRecentPracticeWord,
+  recordCompletedGame,
   DEFAULT_STATS,
 } from './utils/storage.ts';
 
@@ -51,8 +52,8 @@ export default function App() {
   // Active Mode
   const [mode, setMode] = useState<GameMode>('daily');
 
-  // Daily puzzle metadata
-  const [{ word: dailyWord, dayIndex: dailyDayIndex, dateString: dailyDateString }] = useState(() =>
+  // Daily puzzle metadata (UTC deterministic)
+  const [{ word: dailyWord, dayIndex: dailyDayIndex, dateString: dailyDateString, dateKey: dailyDateKey }] = useState(() =>
     getDailyWordAndIndex()
   );
 
@@ -220,7 +221,7 @@ export default function App() {
     }
 
     if (mode === 'daily') {
-      const savedDaily = loadDailyState();
+      const savedDaily = loadDailyState(dailyDayIndex);
       if (savedDaily && savedDaily.dayIndex === dailyDayIndex) {
         setTargetWord(savedDaily.targetWord);
         setGuesses(savedDaily.guesses);
@@ -485,6 +486,7 @@ export default function App() {
           saveDailyState({
             dayIndex: dailyDayIndex,
             dateString: dailyDateString,
+            dateKey: dailyDateKey,
             targetWord,
             guesses: newGuesses,
             gameStatus: 'WON',
@@ -538,6 +540,7 @@ export default function App() {
           saveDailyState({
             dayIndex: dailyDayIndex,
             dateString: dailyDateString,
+            dateKey: dailyDateKey,
             targetWord,
             guesses: newGuesses,
             gameStatus: 'LOST',
@@ -584,6 +587,7 @@ export default function App() {
           saveDailyState({
             dayIndex: dailyDayIndex,
             dateString: dailyDateString,
+            dateKey: dailyDateKey,
             targetWord,
             guesses: newGuesses,
             gameStatus: 'IN_PROGRESS',
@@ -646,42 +650,41 @@ export default function App() {
     const isDaily = mode === 'daily';
     const currentStats = isDaily ? dailyStats : practiceStats;
 
-    const newPlayed = currentStats.played + 1;
-    const newWon = currentStats.won + (won ? 1 : 0);
-    const newCurrentStreak = won ? currentStats.currentStreak + 1 : 0;
-    const newMaxStreak = Math.max(currentStats.maxStreak, newCurrentStreak);
-    const newTotalTime = (currentStats.totalTimeSeconds || 0) + (durationSeconds || 0);
-
-    const newDist = { ...currentStats.guessDistribution };
-    if (won && attempts >= 1 && attempts <= 6) {
-      newDist[attempts as 1 | 2 | 3 | 4 | 5 | 6] = (newDist[attempts as 1 | 2 | 3 | 4 | 5 | 6] || 0) + 1;
-    }
-
-    const updated: UserStats = {
-      played: newPlayed,
-      won: newWon,
-      currentStreak: newCurrentStreak,
-      maxStreak: newMaxStreak,
-      totalTimeSeconds: newTotalTime,
-      guessDistribution: newDist,
-      lastWonDate: won ? new Date().toISOString() : currentStats.lastWonDate,
-    };
+    const { updatedStats } = recordCompletedGame({
+      currentStats,
+      isDaily,
+      won,
+      attempts,
+      durationSeconds,
+      dateKey: dailyDateKey,
+      dayIndex: dailyDayIndex,
+      targetWord,
+      guesses,
+    });
 
     if (isDaily) {
-      setDailyStats(updated);
-      saveDailyStats(updated);
+      setDailyStats(updatedStats);
+      saveDailyStats(updatedStats);
     } else {
-      setPracticeStats(updated);
-      savePracticeStats(updated);
+      setPracticeStats(updatedStats);
+      savePracticeStats(updatedStats);
     }
   };
 
   // Physical Keyboard Listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if typing in an input or if modal is open
-      if (isHelpOpen || isStatsOpen || isSettingsOpen) return;
+      // Ignore if typing in an input, textarea, or if any modal is open
+      if (isHelpOpen || isStatsOpen || isSettingsOpen || isLobbyOpen) return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+      ) {
+        return;
+      }
       if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (gameStatus !== 'IN_PROGRESS' || isEvaluating) return;
 
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -697,7 +700,17 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isHelpOpen, isStatsOpen, isSettingsOpen, handleEnter, handleDelete, handleChar]);
+  }, [
+    isHelpOpen,
+    isStatsOpen,
+    isSettingsOpen,
+    isLobbyOpen,
+    gameStatus,
+    isEvaluating,
+    handleEnter,
+    handleDelete,
+    handleChar,
+  ]);
 
   // Share functionality with Web Share API and Clipboard fallback
   const handleShare = () => {

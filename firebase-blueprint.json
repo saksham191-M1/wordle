@@ -42,6 +42,7 @@
         "winnerId": { "type": "string", "maxLength": 128 },
         "winnerName": { "type": "string", "maxLength": 64 },
         "winningTeam": { "type": "string", "enum": ["teamA", "teamB"] },
+        "expiresAt": { "type": "number" },
         "createdAt": { "type": "string" },
         "updatedAt": { "type": "string" }
       },

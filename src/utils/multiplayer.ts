@@ -10,6 +10,7 @@ import {
   where,
   limit,
   onSnapshot,
+  runTransaction,
 } from 'firebase/firestore';
 import { User } from 'firebase/auth';
 import { db, handleFirestoreError, OperationType } from '../firebase.ts';
@@ -80,6 +81,7 @@ export async function createRoom(
     teamAEmojiRows: [],
     teamBGuesses: [],
     teamBEmojiRows: [],
+    expiresAt: Date.now() + 24 * 60 * 60 * 1000, // 24-hour expiration window
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -125,6 +127,10 @@ export async function joinRoomByCode(code: string, user: User): Promise<string> 
     const roomDoc = snapshot.docs[0];
     const room = roomDoc.data() as RoomData;
     const roomId = roomDoc.id;
+
+    if (room.expiresAt && Date.now() > room.expiresAt) {
+      throw new Error('This room has expired (older than 24 hours). Please create a new room.');
+    }
 
     if (room.status === 'FINISHED') {
       throw new Error('This game has already finished. Ask host for a new room!');
@@ -299,41 +305,62 @@ export async function updatePlayerProgress({
     if (!roomSnap.exists()) return;
     const roomData = roomSnap.data() as RoomData;
 
-    // --- SPRINT / FASTEST FINGER FIRST LOGIC ---
+    // --- SPRINT / FASTEST FINGER FIRST TRANSACTIONAL LOGIC ---
     if (roomData.format === 'sprint' && hasWon && roomData.status === 'PLAYING') {
-      const currentScores = roomData.scores || {};
-      const newScore = (currentScores[user.uid] || 0) + 1;
-      const updatedScores = { ...currentScores, [user.uid]: newScore };
+      const winningGuess = guesses[guesses.length - 1]?.toUpperCase();
+      let advancedRound = false;
+      let newScore = 0;
+      let finalUpdatedScores: Record<string, number> = {};
 
-      const limitType = roomData.sprintLimitType || 'words';
-      const targetWords = roomData.sprintTargetWords || 3;
-      const isWordLimitReached = limitType === 'words' && newScore >= targetWords;
+      await runTransaction(db, async transaction => {
+        const freshRoomDoc = await transaction.get(roomRef);
+        if (!freshRoomDoc.exists()) return;
+        const freshRoom = freshRoomDoc.data() as RoomData;
 
-      if (isWordLimitReached) {
-        // Player reached target words -> Match Over!
-        await updateDoc(roomRef, {
-          scores: updatedScores,
-          winnerId: user.uid,
-          winnerName: user.displayName || user.email?.split('@')[0] || 'Winner',
-          status: 'FINISHED',
-          updatedAt: new Date().toISOString(),
-        });
-      } else {
-        // Advance to next word round!
-        const nextWord = getRandomWord().toUpperCase();
-        const nextRound = (roomData.roundNumber || 1) + 1;
+        // Race check 1: room must still be actively PLAYING
+        if (freshRoom.status !== 'PLAYING') return;
 
-        await updateDoc(roomRef, {
-          scores: updatedScores,
-          targetWord: nextWord,
-          roundNumber: nextRound,
-          roundWinnerName: user.displayName || user.email?.split('@')[0] || 'A player',
-          roundWinnerWord: roomData.targetWord,
-          nextRoundStartsAt: Date.now() + 2500,
-          updatedAt: new Date().toISOString(),
-        });
+        // Race check 2: winning guess must match the current round target word!
+        // If another player already solved this round and advanced the word, abort to prevent duplicate round progression
+        if (freshRoom.targetWord !== winningGuess) return;
 
-        // Reset boards of all players for the next round
+        const currentScores = freshRoom.scores || {};
+        newScore = (currentScores[user.uid] || 0) + 1;
+        finalUpdatedScores = { ...currentScores, [user.uid]: newScore };
+
+        const limitType = freshRoom.sprintLimitType || 'words';
+        const targetWords = freshRoom.sprintTargetWords || 3;
+        const isWordLimitReached = limitType === 'words' && newScore >= targetWords;
+
+        if (isWordLimitReached) {
+          // Player reached target words -> Match Over!
+          transaction.update(roomRef, {
+            scores: finalUpdatedScores,
+            winnerId: user.uid,
+            winnerName: user.displayName || user.email?.split('@')[0] || 'Winner',
+            status: 'FINISHED',
+            updatedAt: new Date().toISOString(),
+          });
+        } else {
+          // Advance to next word round atomically!
+          const nextWord = getRandomWord().toUpperCase();
+          const nextRound = (freshRoom.roundNumber || 1) + 1;
+
+          transaction.update(roomRef, {
+            scores: finalUpdatedScores,
+            targetWord: nextWord,
+            roundNumber: nextRound,
+            roundWinnerName: user.displayName || user.email?.split('@')[0] || 'A player',
+            roundWinnerWord: freshRoom.targetWord,
+            nextRoundStartsAt: Date.now() + 2500,
+            updatedAt: new Date().toISOString(),
+          });
+          advancedRound = true;
+        }
+      });
+
+      // If this transaction successfully advanced the round, reset player boards
+      if (advancedRound) {
         const playersRef = collection(db, 'rooms', roomId, 'players');
         const playersSnap = await getDocs(playersRef);
         for (const playerDoc of playersSnap.docs) {
@@ -344,7 +371,7 @@ export async function updatePlayerProgress({
             attempts: 0,
             hasWon: false,
             hasLost: false,
-            score: isScorer ? newScore : updatedScores[playerDoc.id] || 0,
+            score: isScorer ? newScore : finalUpdatedScores[playerDoc.id] || 0,
             updatedAt: new Date().toISOString(),
           });
         }
@@ -486,4 +513,20 @@ export function subscribeToPlayers(
       handleFirestoreError(error, OperationType.GET, `rooms/${roomId}/players`);
     }
   );
+}
+
+/** Check and delete room if it has expired past 24 hours */
+export async function cleanupExpiredRoom(roomId: string): Promise<boolean> {
+  try {
+    const roomSnap = await getDoc(doc(db, 'rooms', roomId));
+    if (!roomSnap.exists()) return false;
+    const room = roomSnap.data() as RoomData;
+    if (room.expiresAt && Date.now() > room.expiresAt) {
+      await deleteDoc(doc(db, 'rooms', roomId));
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
 }

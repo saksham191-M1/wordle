@@ -17,6 +17,17 @@ export interface GameSettings {
   reducedMotion: boolean;
 }
 
+export interface DailyHistoryRecord {
+  dayIndex: number;
+  dateKey: string; // 'YYYY-MM-DD'
+  targetWord: string;
+  guesses: string[];
+  won: boolean;
+  attempts: number;
+  completedAt: number;
+  durationSeconds?: number;
+}
+
 export interface UserStats {
   played: number;
   won: number;
@@ -32,11 +43,16 @@ export interface UserStats {
     6: number;
   };
   lastWonDate?: string;
+  lastWonDateKey?: string;
+  lastCompletedDateKey?: string;
+  dailyHistory?: Record<string, DailyHistoryRecord>;
 }
 
 export interface DailySavedState {
+  version?: number;
   dayIndex: number;
   dateString: string;
+  dateKey?: string;
   targetWord: string;
   guesses: string[];
   gameStatus: GameStatus;

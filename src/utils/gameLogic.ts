@@ -57,8 +57,9 @@ export function evaluateGuess(guess: string, target: string): EvaluatedLetter[] 
 
 /**
  * Enforces Hard Mode constraints before a guess is accepted:
- * 1. Any previously revealed 'correct' letter must be used in the exact same spot.
- * 2. Any previously revealed 'present' letter must be contained in the new guess.
+ * 1. Any previously revealed 'correct' letter across ANY previous guess must be used in the exact same spot.
+ * 2. Any previously revealed letters ('correct' or 'present') establish a minimum required frequency
+ *    for that character (e.g. if a prior guess revealed 2 'E's, the new guess must contain at least 2 'E's).
  */
 export function checkHardModeConstraints(
   newGuess: string,
@@ -66,38 +67,65 @@ export function checkHardModeConstraints(
 ): { valid: boolean; message?: string } {
   if (evaluatedRows.length === 0) return { valid: true };
 
-  const lastEvaluation = evaluatedRows[evaluatedRows.length - 1];
   const newChars = newGuess.toUpperCase().split('');
 
-  // 1. Check Greens: all greens discovered across ANY previous guess must be maintained
+  // 1. Check Greens: aggregate all greens discovered across ANY previous guess
+  const fixedGreens: (string | null)[] = [null, null, null, null, null];
   for (const row of evaluatedRows) {
-    for (let i = 0; i < row.length; i++) {
+    for (let i = 0; i < 5; i++) {
       if (row[i].status === 'correct') {
-        if (newChars[i] !== row[i].char) {
-          const ordinal = ['1st', '2nd', '3rd', '4th', '5th'][i];
-          return {
-            valid: false,
-            message: `${ordinal} letter must be ${row[i].char}`,
-          };
-        }
+        fixedGreens[i] = row[i].char;
       }
     }
   }
 
-  // 2. Check Yellows: any yellow discovered in the most recent guess must be present
-  const requiredYellows: Set<string> = new Set();
-  for (const item of lastEvaluation) {
-    if (item.status === 'present') {
-      requiredYellows.add(item.char);
+  const ordinals = ['1st', '2nd', '3rd', '4th', '5th'];
+  for (let i = 0; i < 5; i++) {
+    if (fixedGreens[i] !== null && newChars[i] !== fixedGreens[i]) {
+      return {
+        valid: false,
+        message: `${ordinals[i]} letter must be ${fixedGreens[i]}`,
+      };
     }
   }
 
-  for (const yellowChar of requiredYellows) {
-    if (!newChars.includes(yellowChar)) {
-      return {
-        valid: false,
-        message: `Guess must contain ${yellowChar}`,
-      };
+  // 2. Track minimum required character frequencies from yellow and green feedback.
+  // In any single guess, the sum of 'correct' and 'present' occurrences for letter L
+  // provides a strict lower bound on the number of times letter L must appear.
+  const minRequiredCounts: Record<string, number> = {};
+  for (const row of evaluatedRows) {
+    const rowCounts: Record<string, number> = {};
+    for (const item of row) {
+      if (item.status === 'correct' || item.status === 'present') {
+        rowCounts[item.char] = (rowCounts[item.char] || 0) + 1;
+      }
+    }
+    for (const [char, count] of Object.entries(rowCounts)) {
+      minRequiredCounts[char] = Math.max(minRequiredCounts[char] || 0, count);
+    }
+  }
+
+  // Count frequencies in the prospective new guess
+  const newCounts: Record<string, number> = {};
+  for (const ch of newChars) {
+    newCounts[ch] = (newCounts[ch] || 0) + 1;
+  }
+
+  // Verify that all required letter frequencies are satisfied
+  for (const [char, minCount] of Object.entries(minRequiredCounts)) {
+    const actualCount = newCounts[char] || 0;
+    if (actualCount < minCount) {
+      if (minCount === 1) {
+        return {
+          valid: false,
+          message: `Guess must contain ${char}`,
+        };
+      } else {
+        return {
+          valid: false,
+          message: `Guess must contain at least ${minCount} '${char}'s`,
+        };
+      }
     }
   }
 

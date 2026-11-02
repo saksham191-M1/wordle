@@ -48,9 +48,15 @@ service cloud.firestore {
 
       allow update: if isSignedIn()
         && request.resource.data.roomId == resource.data.roomId
-        && request.resource.data.hostId == resource.data.hostId;
+        && request.resource.data.hostId == resource.data.hostId
+        && request.resource.data.code == resource.data.code
+        && request.resource.data.format == resource.data.format
+        && request.resource.data.status in ['WAITING', 'PLAYING', 'FINISHED'];
 
-      allow delete: if isSignedIn() && resource.data.hostId == request.auth.uid;
+      allow delete: if isSignedIn() && (
+        resource.data.hostId == request.auth.uid ||
+        (resource.data.expiresAt != null && request.time.toMillis() > resource.data.expiresAt)
+      );
 
       // Players within rooms
       match /players/{playerId} {
