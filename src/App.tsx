@@ -83,6 +83,10 @@ export default function App() {
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [activeRoom, setActiveRoom] = useState<RoomData | null>(null);
   const [roomPlayers, setRoomPlayers] = useState<RoomPlayerData[]>([]);
+  const roomPlayersRef = useRef<RoomPlayerData[]>(roomPlayers);
+  roomPlayersRef.current = roomPlayers;
+  const targetWordRef = useRef<string>(dailyWord);
+  targetWordRef.current = targetWord;
 
   // Stats
   const [dailyStats, setDailyStats] = useState<UserStats>(() => loadDailyStats());
@@ -136,8 +140,8 @@ export default function App() {
   // Listen to active multiplayer room & players
   useEffect(() => {
     if (!activeRoomId) {
-      setActiveRoom(null);
-      setRoomPlayers([]);
+      setActiveRoom(prev => (prev === null ? prev : null));
+      setRoomPlayers(prev => (prev.length === 0 ? prev : []));
       return;
     }
 
@@ -151,25 +155,26 @@ export default function App() {
       setActiveRoom(room);
 
       // Synchronize target word on rematch or sprint round advance
-      setTargetWord(prev => {
-        if (prev !== room.targetWord) {
-          setGuesses([]);
-          setCurrentGuess('');
-          setEvaluatedRows([]);
-          setGameStatus('IN_PROGRESS');
-          setWonRowIndex(null);
-          setGameStartTime(Date.now());
-          setCurrentGameDuration(null);
-          if (room.format === 'sprint' && room.roundNumber && room.roundNumber > 1) {
-            showToast(`Round ${room.roundNumber}! New word!`, 2000);
-          }
+      if (room.targetWord && targetWordRef.current !== room.targetWord) {
+        targetWordRef.current = room.targetWord;
+        setTargetWord(room.targetWord);
+        setGuesses([]);
+        setCurrentGuess('');
+        setEvaluatedRows([]);
+        setGameStatus('IN_PROGRESS');
+        setWonRowIndex(null);
+        setGameStartTime(Date.now());
+        setCurrentGameDuration(null);
+        if (room.format === 'sprint' && room.roundNumber && room.roundNumber > 1) {
+          showToast(`Round ${room.roundNumber}! New word!`, 2000);
         }
-        return room.targetWord;
-      });
+      }
 
       if (room.status === 'FINISHED') {
         if (room.winningTeam) {
-          const myPlayer = auth.currentUser ? roomPlayers.find(p => p.uid === auth.currentUser?.uid) : null;
+          const myPlayer = auth.currentUser
+            ? roomPlayersRef.current.find(p => p.uid === auth.currentUser?.uid)
+            : null;
           if (myPlayer?.team === room.winningTeam) {
             setGameStatus('WON');
             showToast('Victory! Your team cracked the word first!', 4000);
@@ -194,7 +199,7 @@ export default function App() {
       unsubRoom();
       unsubPlayers();
     };
-  }, [activeRoomId, showToast, roomPlayers]);
+  }, [activeRoomId, showToast]);
 
   // Synchronize collaborative team board in 2v2 and 3v3 team modes
   useEffect(() => {
