@@ -102,11 +102,36 @@
   transform-style: preserve-3d;
 }
 
+/* Subtle Streak Badge Celebration Pulse */
+@keyframes streak-pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.6);
+  }
+  30% {
+    transform: scale(1.15);
+    box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.25);
+  }
+  60% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 10px rgba(245, 158, 11, 0);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+  }
+}
+
+.animate-streak-pulse {
+  animation: streak-pulse 1000ms cubic-bezier(0.4, 0, 0.2, 1) 2;
+}
+
 /* Reduced motion support */
 @media (prefers-reduced-motion: reduce) {
   .animate-tile-pop,
   .animate-row-shake,
   .animate-tile-bounce,
+  .animate-streak-pulse,
   .key-press-effect:active {
     animation: none !important;
     transition: none !important;

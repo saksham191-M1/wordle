@@ -1,5 +1,5 @@
 import React from 'react';
-import { HelpCircle, BarChart3, Settings, Volume2, VolumeX, Sparkles, Sun, Moon, Users } from 'lucide-react';
+import { HelpCircle, BarChart3, Settings, Volume2, VolumeX, Sparkles, Sun, Moon, Users, Flame } from 'lucide-react';
 import { GameMode, GameSettings } from '../types/game.ts';
 
 interface HeaderProps {
@@ -14,6 +14,8 @@ interface HeaderProps {
   onOpenSettings: () => void;
   onOpenMultiplayer: () => void;
   inRoomCode?: string;
+  dailyStreak?: number;
+  celebrateStreak?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -28,7 +30,11 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSettings,
   onOpenMultiplayer,
   inRoomCode,
+  dailyStreak = 0,
+  celebrateStreak = false,
 }) => {
+  const isPulsing = Boolean(celebrateStreak && !settings.reducedMotion);
+
   return (
     <header className="w-full max-w-xl mx-auto flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 border-b border-slate-200 dark:border-slate-800 transition-colors">
       {/* Zone 1: Brand & Logo */}
@@ -37,14 +43,39 @@ export const Header: React.FC<HeaderProps> = ({
           L
         </div>
         <div className="flex flex-col">
-          <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-1.5 leading-none">
-            LexiCraft
+          <div className="flex items-center gap-1.5 leading-none">
+            <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+              LexiCraft
+            </span>
             {settings.hardMode && (
               <span className="text-[10px] font-semibold text-amber-500 dark:text-amber-400 tracking-wide uppercase">
                 HARD
               </span>
             )}
-          </span>
+            {dailyStreak > 1 && (
+              <button
+                type="button"
+                onClick={onOpenStats}
+                data-testid="daily-streak-badge"
+                title={`Daily Challenge Streak: ${dailyStreak} days (Click to view statistics)`}
+                aria-label={`Daily Challenge Streak: ${dailyStreak} days`}
+                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95 ${
+                  isPulsing
+                    ? 'animate-streak-pulse ring-2 ring-amber-400 bg-amber-500/25 text-amber-600 dark:text-amber-300 border border-amber-400 scale-105'
+                    : 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:border-amber-500/50'
+                }`}
+              >
+                <Flame
+                  className={`w-3.5 h-3.5 transition-transform duration-300 ${
+                    isPulsing
+                      ? 'fill-amber-400 text-amber-500 scale-110 drop-shadow-[0_0_4px_rgba(245,158,11,0.6)]'
+                      : 'fill-amber-500 text-amber-500'
+                  }`}
+                />
+                <span className="tabular-nums font-extrabold">{dailyStreak}</span>
+              </button>
+            )}
+          </div>
           <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
             {mode === 'daily'
               ? `Daily #${dayIndex}`
@@ -128,7 +159,7 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           onClick={onOpenStats}
           className="p-1.5 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-md transition-colors"
-          title="Statistics"
+          title={dailyStreak > 1 ? `Statistics (${dailyStreak}-day streak)` : 'Statistics'}
           aria-label="Statistics"
         >
           <BarChart3 className="w-4 h-4" />

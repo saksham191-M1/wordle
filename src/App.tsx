@@ -87,6 +87,16 @@ export default function App() {
   // Stats
   const [dailyStats, setDailyStats] = useState<UserStats>(() => loadDailyStats());
   const [practiceStats, setPracticeStats] = useState<UserStats>(() => loadPracticeStats());
+  const [celebrateStreak, setCelebrateStreak] = useState<boolean>(false);
+  const streakCelebrationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (streakCelebrationTimeoutRef.current) {
+        clearTimeout(streakCelebrationTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Game Time Tracking
   const [gameStartTime, setGameStartTime] = useState<number>(() => Date.now());
@@ -494,6 +504,15 @@ export default function App() {
             completedTimeSeconds: durationSeconds,
             completedAt: Date.now(),
           });
+
+          // Trigger subtle celebration pulse on the daily streak badge
+          setCelebrateStreak(true);
+          if (streakCelebrationTimeoutRef.current) {
+            clearTimeout(streakCelebrationTimeoutRef.current);
+          }
+          streakCelebrationTimeoutRef.current = setTimeout(() => {
+            setCelebrateStreak(false);
+          }, 2500);
         }
 
         // Sync multiplayer progress
@@ -779,6 +798,8 @@ export default function App() {
         }}
         dayIndex={dailyDayIndex}
         settings={settings}
+        dailyStreak={dailyStats.currentStreak}
+        celebrateStreak={celebrateStreak}
         onToggleSound={() => setSettings(s => ({ ...s, soundEnabled: !s.soundEnabled }))}
         onToggleTheme={() => setSettings(s => ({ ...s, theme: s.theme === 'dark' ? 'light' : 'dark' }))}
         onOpenHelp={() => setIsHelpOpen(true)}

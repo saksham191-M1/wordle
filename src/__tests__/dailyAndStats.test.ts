@@ -1,3 +1,5 @@
+import React from 'react';
+import { renderToString } from 'react-dom/server';
 import { describe, it, expect } from 'vitest';
 import { getDailyWordAndIndex, getUtcDateKey, TARGET_WORDS } from '../data/words.ts';
 import {
@@ -5,8 +7,10 @@ import {
   validateAndMigrateStats,
   recordCompletedGame,
   DEFAULT_STATS,
+  DEFAULT_SETTINGS,
 } from '../utils/storage.ts';
 import { UserStats } from '../types/game.ts';
+import { Header } from '../components/Header.tsx';
 
 describe('Daily Challenge UTC Determinism', () => {
   it('consistently produces the identical target word and dayIndex for a given UTC date', () => {
@@ -281,5 +285,84 @@ describe('Restored Statistics Validation & Migration', () => {
     const validated = validateAndMigrateStats(savedDailyStats, true, '2025-05-11');
 
     expect(validated.currentStreak).toBe(5);
+  });
+});
+
+describe('Header Daily Streak Badge', () => {
+  const dummyProps = {
+    mode: 'daily' as const,
+    onSelectMode: () => {},
+    dayIndex: 100,
+    settings: DEFAULT_SETTINGS,
+    onToggleSound: () => {},
+    onToggleTheme: () => {},
+    onOpenHelp: () => {},
+    onOpenStats: () => {},
+    onOpenSettings: () => {},
+    onOpenMultiplayer: () => {},
+  };
+
+  it('does NOT render the streak badge when daily streak is 0', () => {
+    const html = renderToString(React.createElement(Header, { ...dummyProps, dailyStreak: 0 }));
+    expect(html).not.toContain('data-testid="daily-streak-badge"');
+  });
+
+  it('does NOT render the streak badge when daily streak is 1', () => {
+    const html = renderToString(React.createElement(Header, { ...dummyProps, dailyStreak: 1 }));
+    expect(html).not.toContain('data-testid="daily-streak-badge"');
+  });
+
+  it('renders the streak badge when daily streak is greater than 1', () => {
+    const html = renderToString(React.createElement(Header, { ...dummyProps, dailyStreak: 4 }));
+    expect(html).toContain('data-testid="daily-streak-badge"');
+    expect(html).toContain('4');
+    expect(html).toContain('Daily Challenge Streak: 4 days');
+  });
+
+  it('renders the streak badge across different game modes if streak > 1', () => {
+    const practiceHtml = renderToString(
+      React.createElement(Header, { ...dummyProps, mode: 'practice', dailyStreak: 7 })
+    );
+    expect(practiceHtml).toContain('data-testid="daily-streak-badge"');
+    expect(practiceHtml).toContain('7');
+  });
+
+  it('adds animate-streak-pulse to streak badge when celebrateStreak is true and reducedMotion is false', () => {
+    const html = renderToString(
+      React.createElement(Header, {
+        ...dummyProps,
+        dailyStreak: 3,
+        celebrateStreak: true,
+        settings: { ...DEFAULT_SETTINGS, reducedMotion: false },
+      })
+    );
+    expect(html).toContain('data-testid="daily-streak-badge"');
+    expect(html).toContain('animate-streak-pulse');
+  });
+
+  it('does NOT add animate-streak-pulse when celebrateStreak is false', () => {
+    const html = renderToString(
+      React.createElement(Header, {
+        ...dummyProps,
+        dailyStreak: 3,
+        celebrateStreak: false,
+        settings: { ...DEFAULT_SETTINGS, reducedMotion: false },
+      })
+    );
+    expect(html).toContain('data-testid="daily-streak-badge"');
+    expect(html).not.toContain('animate-streak-pulse');
+  });
+
+  it('respects reducedMotion setting and suppresses animate-streak-pulse when reducedMotion is true', () => {
+    const html = renderToString(
+      React.createElement(Header, {
+        ...dummyProps,
+        dailyStreak: 5,
+        celebrateStreak: true,
+        settings: { ...DEFAULT_SETTINGS, reducedMotion: true },
+      })
+    );
+    expect(html).toContain('data-testid="daily-streak-badge"');
+    expect(html).not.toContain('animate-streak-pulse');
   });
 });
